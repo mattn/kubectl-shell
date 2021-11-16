@@ -15,8 +15,13 @@ $ kubectl shell $(kubectl get pods --field-selector=status.phase=Running -o name
 
 ## Installation
 
+<!--
 ```
 $ krew install shell
+```
+-->
+```
+$ go install github.com/mattn/kubectl-shell@latest
 ```
 
 ## License
