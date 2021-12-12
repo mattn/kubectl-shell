@@ -22,20 +22,17 @@ import (
 
 const name = "kubectl-shell"
 
-const version = "0.0.2"
+const version = "0.0.3"
 
 var revision = "HEAD"
 
-func listPods() error {
-	var kubeconfig *string
-	if home := homedir.HomeDir(); home != "" {
-		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
-	} else {
-		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
-	}
-	flag.Parse()
+var (
+	namespace  string
+	kubeconfig string
+)
 
-	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+func listPods() error {
+	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
 		return err
 	}
@@ -45,7 +42,7 @@ func listPods() error {
 		return err
 	}
 
-	pods, err := clientset.CoreV1().Pods("default").List(context.TODO(), metav1.ListOptions{})
+	pods, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -68,7 +65,7 @@ func choice() (string, error) {
 	cmd.Stdout = &out
 
 	cmd.Env = append(os.Environ(),
-		fmt.Sprintf("FZF_DEFAULT_COMMAND=%s", exe),
+		fmt.Sprintf("FZF_DEFAULT_COMMAND=%s -n=%s", exe, namespace),
 		fmt.Sprintf("_KUBECTX_FORCE_COLOR=1"))
 	if err := cmd.Run(); err != nil {
 		if _, ok := err.(*exec.ExitError); !ok {
@@ -92,6 +89,12 @@ func main() {
 	var showVersion bool
 	flag.StringVar(&shell, "e", "/bin/bash", "Used shell")
 	flag.BoolVar(&showVersion, "V", false, "Print the version")
+	flag.StringVar(&namespace, "n", "default", "namespace")
+	if home := homedir.HomeDir(); home != "" {
+		flag.StringVar(&kubeconfig, "kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+	} else {
+		flag.StringVar(&kubeconfig, "kubeconfig", "", "absolute path to the kubeconfig file")
+	}
 	flag.Parse()
 
 	if showVersion {
@@ -119,6 +122,8 @@ func main() {
 
 	args := []string{
 		"exec",
+		"-n",
+		namespace,
 		"--stdin",
 		"--tty",
 		pod,
@@ -127,7 +132,7 @@ func main() {
 	if flag.NArg() > 0 {
 		args = append(args, flag.Args()[1:]...)
 	}
-	if len(args) == 5 {
+	if len(args) == 7 {
 		args = append(args, shell)
 	}
 	cmd := exec.Command("kubectl", args...)
